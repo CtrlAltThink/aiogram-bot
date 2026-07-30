@@ -4,11 +4,10 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-
 from dotenv import find_dotenv, load_dotenv
 
-from handlers.user_private import user_private_router
 from handlers.admin_private import admin_router
+from handlers.user_private import user_private_router
 
 load_dotenv(find_dotenv())
 

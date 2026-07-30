@@ -22,6 +22,6 @@ async def starting_admin_panel(message: types.Message):
 async def user_info(message: types.Message):
     await message.answer('Список пользователей')
 
-@admin_router.message((F.text.lower() == 'главное меню'))
+@admin_router.message(F.text.lower() == 'главное меню')
 async def menu_cmd(message: types.Message) -> None:
     await message.answer('Вы в главном меню:')
