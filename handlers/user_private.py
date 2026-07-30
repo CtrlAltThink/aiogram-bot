@@ -59,8 +59,7 @@ async def salary(message: types.Message) -> None:
 
 @user_private_router.message(F.text.lower() == 'история')
 @user_private_router.message(Command('history'))
-async def history(message: types.Message, counter) -> None:
-    print(counter)
+async def history(message: types.Message) -> None:
     await message.answer('История смен:')
 
 @user_private_router.message(F.text.lower() == 'настройка кранов')

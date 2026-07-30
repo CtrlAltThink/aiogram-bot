@@ -1,7 +1,8 @@
 from aiogram.types import KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-def get_keyboard(*btns: str, placeholder: str = None, sizes: tuple[int] = (2,)):
+
+def get_keyboard(*btns: str, placeholder: str | None = None, sizes: tuple[int] = (2,)):
     keyboard = ReplyKeyboardBuilder()
 
     for text in btns:
