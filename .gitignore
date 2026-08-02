@@ -4,3 +4,5 @@ venv/
 *.pyc
 .mypy_cache/
 .vscode/
+*.db
+*.sqlite3
