@@ -1,12 +1,10 @@
-from datetime import datetime, timezone
-
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import Shift
+from database.orm_query import orm_add_shift
 from kbds.reply import get_keyboard
 
 user_private_router = Router()
@@ -57,14 +55,9 @@ async def process_hours(message: types.Message, state: FSMContext, session: Asyn
     if hours < 1 or hours > 24:
         await message.answer('Число должно быть от 1 до 24!')
         return
-
-    obj = Shift(
-        user_id=message.from_user.id,
-        date=datetime.now(timezone.utc).date(),
-        hours=hours,
-    )
-    session.add(obj)
-    await session.commit()
+    await state.update_data(hours=hours, user_id=message.from_user.id)
+    data = await state.get_data()
+    await orm_add_shift(session, data)
     await message.answer('Часы добавлены', reply_markup=USER_MAIN_KB)
     await state.clear()
 
