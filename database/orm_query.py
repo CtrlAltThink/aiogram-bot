@@ -1,15 +1,35 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import Shift
+from database.models import Shift, User
 
 
-async def orm_add_shift(session: AsyncSession, data: dict):
+async def orm_get_user(session: AsyncSession, telegram_id):
+    query = select(User).where(User.telegram_id == telegram_id)
+    return await session.scalar(query)
+
+async def orm_add_user(session: AsyncSession, telegram_id, first_name, last_name, base_salary):
+    query = select(User).where(User.telegram_id == telegram_id)
+    user = await session.scalar(query)
+    if user:
+        return
+    else:
+        obj = User(
+            telegram_id=telegram_id,
+            first_name=first_name,
+            last_name=last_name,
+            base_salary=base_salary,
+            )
+        session.add(obj)
+        await session.commit()
+
+async def orm_add_shift(session: AsyncSession, user_id, hours):
     obj = Shift(
-        user_id=data['user_id'],
+        user_id=user_id,
         date=datetime.now(timezone.utc).date(),
-        hours=data['hours'],
+        hours=hours,
     )
     session.add(obj)
     await session.commit()

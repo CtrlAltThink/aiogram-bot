@@ -25,7 +25,7 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    base_salary: Mapped[float | None] = mapped_column(Float(asdecimal=True), nullable=True)
+    base_salary: Mapped[float] = mapped_column(Float(asdecimal=True), nullable=False)
 
 class Shift(Base):
     __tablename__ = 'shifts'

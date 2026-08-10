@@ -2,9 +2,10 @@ from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.orm_query import orm_add_shift
+from database.orm_query import orm_add_shift, orm_add_user, orm_get_user
 from kbds.reply import get_keyboard
 
 user_private_router = Router()
@@ -20,11 +21,34 @@ USER_MAIN_KB=get_keyboard(
                             placeholder='Что вас интересует?',
                             sizes=(2, 2, 2)
                         )
+class Registration(StatesGroup):
+    base_salary = State()
 
 @user_private_router.message(CommandStart())
-async def start_cmd(message: types.Message):
+async def start_cmd(message: types.Message, session: AsyncSession, state: FSMContext):
+    await state.clear()
+    if await orm_get_user(session, message.from_user.id):
+        await message.answer("Привет, я виртуальный помощник!", 
+                             reply_markup=USER_MAIN_KB)
+    else:
+        await message.answer(
+            'Введите свой месячный оклад: '
+        )
+        await state.set_state(Registration.base_salary)
+
+@user_private_router.message(Registration.base_salary, F.text)
+async def process_salary(message: types.Message, state: FSMContext, session: AsyncSession):
+    if not message.text.isdigit():
+        await message.answer('Введите целое число!')
+        return
+    salary = int(message.text)
+    if salary <= 0:
+        await message.answer('Число должно быть больше нуля!')
+        return
+    await orm_add_user(session, message.from_user.id, message.from_user.first_name, message.from_user.last_name, salary)
+    await state.clear()
     await message.answer("Привет, я виртуальный помощник!", 
-                         reply_markup=USER_MAIN_KB)
+                                 reply_markup=USER_MAIN_KB)
 
 class AddShift(StatesGroup):
     hours = State()
@@ -55,11 +79,14 @@ async def process_hours(message: types.Message, state: FSMContext, session: Asyn
     if hours < 1 or hours > 24:
         await message.answer('Число должно быть от 1 до 24!')
         return
-    await state.update_data(hours=hours, user_id=message.from_user.id)
-    data = await state.get_data()
-    await orm_add_shift(session, data)
-    await message.answer('Часы добавлены', reply_markup=USER_MAIN_KB)
-    await state.clear()
+    try:
+        await orm_add_shift(session, message.from_user.id, hours)
+        await message.answer('Часы добавлены', reply_markup=USER_MAIN_KB)
+        await state.clear()
+    except SQLAlchemyError as e:
+        await message.answer(
+            f'Ошибка \n{e}\nОбратитесь к кодеру, он опять хочет денег', reply_markup=USER_MAIN_KB)
+        await state.clear()
 
 
 @user_private_router.message(F.text.lower() == 'зарплата')
