@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
@@ -7,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.orm_query import orm_add_shift, orm_add_user, orm_get_user
 from kbds.reply import get_keyboard
+
+logger = logging.getLogger(__name__)
 
 user_private_router = Router()
 
@@ -21,6 +25,9 @@ USER_MAIN_KB=get_keyboard(
                             placeholder='Что вас интересует?',
                             sizes=(2, 2, 2)
                         )
+
+
+
 class Registration(StatesGroup):
     base_salary = State()
 
@@ -28,13 +35,14 @@ class Registration(StatesGroup):
 async def start_cmd(message: types.Message, session: AsyncSession, state: FSMContext):
     await state.clear()
     if await orm_get_user(session, message.from_user.id):
-        await message.answer("Привет, я виртуальный помощник!", 
+        await message.answer(f"Привет {message.from_user.first_name}, я виртуальный помощник!", 
                              reply_markup=USER_MAIN_KB)
     else:
         await message.answer(
             'Введите свой месячный оклад: '
         )
         await state.set_state(Registration.base_salary)
+
 
 @user_private_router.message(Registration.base_salary, F.text)
 async def process_salary(message: types.Message, state: FSMContext, session: AsyncSession):
@@ -45,10 +53,18 @@ async def process_salary(message: types.Message, state: FSMContext, session: Asy
     if salary <= 0:
         await message.answer('Число должно быть больше нуля!')
         return
-    await orm_add_user(session, message.from_user.id, message.from_user.first_name, message.from_user.last_name, salary)
-    await state.clear()
-    await message.answer("Привет, я виртуальный помощник!", 
-                                 reply_markup=USER_MAIN_KB)
+    try:
+        await orm_add_user(session, message.from_user.id, message.from_user.first_name, message.from_user.last_name, salary)
+        await state.clear()
+        await message.answer(f"Оклад добавлен, его можно изменить в настройках.\n"
+                             f"Привет {message.from_user.first_name}, я виртуальный помощник!", 
+                                     reply_markup=USER_MAIN_KB)
+    except SQLAlchemyError:
+        logger.exception('Ошибка при работе с БД для пользователя telegram_id=%s', message.from_user.id)
+        await state.clear()
+        await message.answer('Ошибка базы данных, напишите в поддержку.', reply_markup=USER_MAIN_KB)
+
+
 
 class AddShift(StatesGroup):
     hours = State()
@@ -81,12 +97,13 @@ async def process_hours(message: types.Message, state: FSMContext, session: Asyn
         return
     try:
         await orm_add_shift(session, message.from_user.id, hours)
-        await message.answer('Часы добавлены', reply_markup=USER_MAIN_KB)
+        await message.answer('Часы добавлены.', reply_markup=USER_MAIN_KB)
         await state.clear()
-    except SQLAlchemyError as e:
-        await message.answer(
-            f'Ошибка \n{e}\nОбратитесь к кодеру, он опять хочет денег', reply_markup=USER_MAIN_KB)
+    except SQLAlchemyError:
+        logger.exception('Ошибка при работе с БД для пользователя telegram_id=%s', message.from_user.id)
         await state.clear()
+        await message.answer('Ошибка базы данных, напишите в поддержку.', reply_markup=USER_MAIN_KB)
+
 
 
 @user_private_router.message(F.text.lower() == 'зарплата')

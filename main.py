@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 from aiogram import Bot, Dispatcher
@@ -36,11 +37,14 @@ async def on_shutdown(bot):
     print('Бот лёг')
 
 async def main():
+    logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - [%(levelname)s] - (%(filename)s:%(lineno)d) - %(message)s'
+        )
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
     dp.update.middleware(DataBaseSession(session_pool=session_maker))
     await bot.delete_webhook(drop_pending_updates=True)
-    # await bot.delete_my_commands(scope=types.BotCommandScopeAllPrivateChats())
     await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
 
 asyncio.run(main())
