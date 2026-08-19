@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -29,6 +30,10 @@ class User(Base):
 
 class Shift(Base):
     __tablename__ = 'shifts'
+
+    __table_args__ = (
+    UniqueConstraint('user_id', 'date', name='uq_user_shift_date'),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.telegram_id'), nullable=False)

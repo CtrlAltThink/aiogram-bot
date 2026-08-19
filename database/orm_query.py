@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Shift, User
@@ -26,10 +27,13 @@ async def orm_add_user(session: AsyncSession, telegram_id, first_name, last_name
         await session.commit()
 
 async def orm_add_shift(session: AsyncSession, user_id, hours):
-    obj = Shift(
-        user_id=user_id,
-        date=datetime.now(timezone.utc).date(),
-        hours=hours,
+    stmt = insert(Shift).values(user_id=user_id,
+                                date=datetime.now(timezone.utc).date(),
+                                hours=hours,
     )
-    session.add(obj)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['user_id', 'date'],
+        set_={'hours': hours}
+    )
+    await session.execute(stmt)
     await session.commit()

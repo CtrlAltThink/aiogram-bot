@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 user_private_router = Router()
 
 USER_MAIN_KB=get_keyboard(
-                            'Добавить смену',
+                            'Записать / Изменить смену',
                             'Зарплата',
                             'История',
                             'Настройка кранов',
@@ -23,7 +23,7 @@ USER_MAIN_KB=get_keyboard(
                             'Помощь',
                             'Главное меню',
                             placeholder='Что вас интересует?',
-                            sizes=(2, 2, 2)
+                            sizes=(1, 2, 2)
                         )
 
 
@@ -69,10 +69,12 @@ async def process_salary(message: types.Message, state: FSMContext, session: Asy
 class AddShift(StatesGroup):
     hours = State()
 
-@user_private_router.message(StateFilter(None), F.text.lower() == 'добавить смену')
+@user_private_router.message(StateFilter(None), F.text.lower() == 'записать / изменить смену')
 async def add_shift(message: types.Message, state: FSMContext):
     await message.answer(
-        'Введите количество часов:', reply_markup=get_keyboard('Отмена', sizes=(1,))
+        'Введите количество часов за сегодня. '
+        'Если за сегодня смена уже существует, часы обновятся на новое значение.', 
+        reply_markup=get_keyboard('Отмена', sizes=(1,))
     )
     await state.set_state(AddShift.hours)
 
