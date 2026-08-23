@@ -7,7 +7,12 @@ from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.orm_query import orm_add_shift, orm_add_user, orm_get_user
+from database.orm_query import (
+    orm_add_shift,
+    orm_add_user,
+    orm_get_user,
+    orm_update_user_salary,
+)
 from kbds.reply import get_keyboard
 
 logger = logging.getLogger(__name__)
@@ -19,7 +24,7 @@ USER_MAIN_KB=get_keyboard(
                             'Зарплата',
                             'История',
                             'Настройка кранов',
-                            'Настройки профиля',
+                            'Изменить оклад',
                             'Помощь',
                             'Главное меню',
                             placeholder='Что вас интересует?',
@@ -80,7 +85,7 @@ async def add_shift(message: types.Message, state: FSMContext):
 
 @user_private_router.message(StateFilter('*'), Command('отмена'))
 @user_private_router.message(StateFilter('*'), F.text.casefold() == 'отмена')
-async def cancel_handler(message: types.Message, state: FSMContext) -> None:
+async def cancel_add_shift(message: types.Message, state: FSMContext) -> None:
     current_state = await state.get_state()
     if current_state is None:
         return
@@ -123,10 +128,38 @@ async def history(message: types.Message) -> None:
 async def crane_help(message: types.Message) -> None:
     await message.answer('Настройка кранов')
 
-@user_private_router.message(F.text.lower() == 'настройки профиля')
-@user_private_router.message(Command('settings'))
-async def settings(message: types.Message) -> None:
-    await message.answer('Настройки профиля:')
+
+
+class EditSalary(StatesGroup):
+    salary = State()
+@user_private_router.message(StateFilter(None), F.text.lower() == 'изменить оклад')
+async def edit_salary(message: types.Message, state: FSMContext) -> None:
+    await message.answer(
+        'Введите оклад:',
+        reply_markup=get_keyboard('Отмена', sizes=(1,))
+    )
+    await state.set_state(EditSalary.salary)
+
+@user_private_router.message(EditSalary.salary, F.text)
+async def process_edit_salary(message: types.Message, state: FSMContext, session: AsyncSession):
+
+    if not message.text.isdigit():
+            await message.answer('Введите целое число!')
+            return
+    salary = float(message.text)
+    if salary < 1:
+        await message.answer('Число должно быть положительным!')
+        return
+    try:
+        await orm_update_user_salary(session, message.from_user.id, salary)
+        await message.answer('Оклад изменён.', reply_markup=USER_MAIN_KB)
+        await state.clear()
+    except SQLAlchemyError:
+        logger.exception('Ошибка при работе с БД для пользователя telegram_id=%s', message.from_user.id)
+        await state.clear()
+        await message.answer('Ошибка базы данных, напишите в поддержку.', reply_markup=USER_MAIN_KB)
+    
+
 
 @user_private_router.message(F.text.lower() == 'помощь')
 @user_private_router.message(Command('help'))
