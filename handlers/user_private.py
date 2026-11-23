@@ -1,4 +1,6 @@
+import calendar
 import logging
+from datetime import datetime, timezone
 
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart, StateFilter, or_f
@@ -10,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.orm_query import (
     orm_add_shift,
     orm_add_user,
+    orm_get_this_month_hours,
     orm_get_user,
     orm_update_user_salary,
 )
@@ -115,8 +118,24 @@ async def process_hours(message: types.Message, state: FSMContext, session: Asyn
 
 @user_private_router.message(F.text.lower() == 'зарплата')
 @user_private_router.message(Command('salary'))
-async def salary(message: types.Message) -> None:
-    await message.answer('Ваша прогнозируемая ЗП:')
+async def salary(message: types.Message, session: AsyncSession) -> None:
+    hours = await orm_get_this_month_hours(session, message.from_user.id)
+    user = await orm_get_user(session, message.from_user.id)
+    now = datetime.now(timezone.utc)
+    current_year = now.year
+    current_month = now.month
+    _, days_in_month = calendar.monthrange(current_year, current_month)
+    work_days = 0
+    for day in range(1, days_in_month + 1):
+        if calendar.weekday(current_year, current_month, day) < 5:
+            work_days += 1
+    month_norm_hours = work_days * 8
+    hourly_rate = user.base_salary / month_norm_hours if month_norm_hours > 0 else 0
+    earned_salary = hours * hourly_rate
+    await message.answer(f'Отработано в этом месяце: {hours} ч.')
+    await message.answer(f'Базовый оклад: {int(user.base_salary)} руб.')
+    await message.answer(f'За этот месяц вы получите: {round(earned_salary, 2)} руб.')
+
 
 @user_private_router.message(F.text.lower() == 'история')
 @user_private_router.message(Command('history'))
@@ -146,7 +165,7 @@ async def process_edit_salary(message: types.Message, state: FSMContext, session
     if not message.text.isdigit():
             await message.answer('Введите целое число!')
             return
-    salary = float(message.text)
+    salary = int(message.text)
     if salary < 1:
         await message.answer('Число должно быть положительным!')
         return

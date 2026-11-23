@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import extract, func, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from database.models import Shift, User
 async def orm_get_user(session: AsyncSession, telegram_id):
     query = select(User).where(User.telegram_id == telegram_id)
     return await session.scalar(query)
+
 
 async def orm_add_user(session: AsyncSession, telegram_id, first_name, last_name, base_salary):
     query = select(User).where(User.telegram_id == telegram_id)
@@ -26,6 +27,7 @@ async def orm_add_user(session: AsyncSession, telegram_id, first_name, last_name
         session.add(obj)
         await session.commit()
 
+
 async def orm_add_shift(session: AsyncSession, user_id: int, hours: int):
     stmt = insert(Shift).values(user_id=user_id,
                                 date=datetime.now(timezone.utc).date(),
@@ -38,9 +40,21 @@ async def orm_add_shift(session: AsyncSession, user_id: int, hours: int):
     await session.execute(stmt)
     await session.commit()
 
+
 async def orm_update_user_salary(session: AsyncSession, user_id: int, new_user_salary: float):
     stmt = (
         update(User).where(User.telegram_id == user_id).values(base_salary=new_user_salary)
     )
     await session.execute(stmt)
     await session.commit()
+
+
+async def orm_get_this_month_hours(session: AsyncSession, user_id: int):
+    now = datetime.now(timezone.utc)
+    stmt = select(func.sum(Shift.hours)).where(
+        Shift.user_id == user_id,
+        extract('month', Shift.date) == now.month,
+        extract('year', Shift.date) == now.year
+    )
+    result = await session.scalar(stmt)
+    return result or 0
